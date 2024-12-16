@@ -4,41 +4,50 @@ import os
 import re
 import time
 from datetime import datetime
-from qtpy.QtCore import QDateTime, QEvent, QRegExp, Qt, Signal, QThread, QUrl
+from qtpy.QtCore import QDateTime, QEvent, QObject, QRegExp, Qt, Signal, QThread, QUrl
 from qtpy.QtGui import QIntValidator
 from qtpy.QtWebSockets import QWebSocket
 from qtpy.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDateTimeEdit, QLabel, QTableView, QFormLayout,
                             QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QHeaderView, QLineEdit, QSpacerItem,
                             QSizePolicy, QMessageBox)
+from typing import Any, Dict, Optional
 from urllib.parse import quote
 from .log_data import LogData
 from .log_fetcher import LogFetcher
-from .table_models import LokiTableModel, LogViewerProxyModel
+from .table_models import MessageLogTableModel, LogViewerProxyModel
 
+logger = logging.getLogger(__name__)
 
-class LokiLogViewer(QWidget):
+class MessageLogViewer(QWidget):
+    """
+    The MessageLogViewer is the top level widget responsible for letting the user interact with the application. It
+    handles making requests for both live and historical data, and applying filters to the results. It uses a
+    QWebSocket to handle the streaming of live log data, and a table model for displaying the results.
+
+    Parameters
+    ----------
+    parent : QObject
+        The parent of this widget
+    """
     MATCH_TEXT = "Like"
     NOT_MATCH_TEXT = "Not Like"
 
-    log_received = Signal(LogData)
-    error_occurred = Signal(str)
+    log_entry_received = Signal(LogData)  # Signal emitted when a new log entry is received from the QWebSocket
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent: Optional[QObject] = None):
+        super().__init__(parent)
         self.connected = False
         self.websocket = QWebSocket()
         self.websocket.textMessageReceived.connect(self.on_message)
         self.websocket.error.connect(self.on_error)
+        if "LOKI_ADDR" not in os.environ:
+            logger.warning("Environment variable LOKI_ADDR not set. Application will use http://localhost:8080")
         self.loki_api_url = os.environ.get("LOKI_ADDR", "http://localhost:8080")
-        self.setup_logger()
         self.init_ui()
-        self.log_received.connect(self.append_new_log_message)
+        self.log_entry_received.connect(self.append_new_log_message)
 
-    def setup_logger(self):
-        logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-
-    def init_ui(self):
+    def init_ui(self) -> None:
+        """ Set up the widgets that comprise the UI """
         self.resize(1200, 600)
         self.layout = QVBoxLayout()
 
@@ -49,8 +58,8 @@ class LokiLogViewer(QWidget):
 
         self.setLayout(self.layout)
 
-
-    def setup_fiter_controls(self):
+    def setup_fiter_controls(self) -> None:
+        """ Set up all controls needed for filtering log information """
         self.filter_text = QLineEdit()
         self.filter_text.setPlaceholderText("Enter a keyword to filter results")
         self.filter_text.setMaximumSize(415, 30)
@@ -125,7 +134,8 @@ class LokiLogViewer(QWidget):
 
         self.layout.addLayout(self.dropdown_layout)
 
-    def setup_date_controls(self):
+    def setup_date_controls(self) -> None:
+        """ Set up controls related to the calendar dates of log info to retrieve """
         self.date_checkbox = QCheckBox("Use Date Range")
         self.start_date_label = QLabel("Start Date:")
         start_date = QDateTime.currentDateTime().addSecs(-600)
@@ -156,7 +166,7 @@ class LokiLogViewer(QWidget):
             "Text": self.text_field,
         }
         for line_edit in self.line_edits.values():
-            line_edit.textChanged.connect(self.reset_combo_box)
+            line_edit.textChanged.connect(self.reset_preset_queries_dropdown)
 
         self.calendar_layout = QHBoxLayout()
         self.calendar_layout.setAlignment(Qt.AlignLeft)
@@ -171,8 +181,9 @@ class LokiLogViewer(QWidget):
         self.layout.addLayout(self.calendar_layout)
         self.layout.addWidget(self.filter_active_label)
 
-    def setup_table_ui(self):
-        self.tableModel = LokiTableModel()
+    def setup_table_ui(self) -> None:
+        """ Set up the table that will display the retrieved log data """
+        self.tableModel = MessageLogTableModel()
         self.tableView = QTableView(self)
 
         self.tableProxyModel = LogViewerProxyModel()
@@ -199,7 +210,8 @@ class LokiLogViewer(QWidget):
         self.layout.addWidget(self.tableView)
 
 
-    def setup_bottom_controls(self):
+    def setup_bottom_controls(self) -> None:
+        """ Set up the bottom panel of controls """
         self.bottom_layout = QHBoxLayout()
         self.max_rows_layout = QFormLayout()
         self.max_rows_layout.setContentsMargins(0, 0, 0, 0)
@@ -235,7 +247,8 @@ class LokiLogViewer(QWidget):
         self.bottom_layout.addLayout(self.action_layout)
         self.layout.addLayout(self.bottom_layout)
 
-    def toggle_connection(self):
+    def toggle_connection(self) -> None:
+        """ Connect to live data if not yet connected, otherwise closeout the websocket if we are connected """
         if not self.connected:
             self.connect_button.setText("Pause live data")
             self.tail_logs()
@@ -244,12 +257,32 @@ class LokiLogViewer(QWidget):
             self.websocket.close()
         self.connected = not self.connected
 
-    def update_max_rows(self):
+    def update_max_rows(self) -> None:
+        """ Updates the maximum amount of rows of data that will be stored in for display in the table """
         max_rows = int(self.max_rows_edit.text())
         self.tableModel.set_max_entries(max_rows)
 
-    def on_message(self, message):
-        # print(f'Received: {message}')
+    def on_message(self, message: str) -> None:
+        """
+        Method called when the websocket receives a new set of log messages from Loki. Parses the values out of the
+        returned stream and emits the signal for appending the new data to the table.
+
+        Parameters
+        ----------
+        message : str
+            The text message received from the websocket. Expected to be a JSON-formatted string containing
+            log data in the following structure:
+            {
+                "streams": [
+                    {
+                        "values": [
+                            [<timestamp>, <log_entry_json>]
+                        ]
+                    }
+                ]
+            }
+        """
+        logger.debug(f'Received log message: {message}')
         values = json.loads(message)
         # print(f'Received: {values}')
         for stream in values["streams"]:
@@ -260,17 +293,44 @@ class LokiLogViewer(QWidget):
             # print(f'log time was: {log_time}')
             log_data = LogData(log_time, log_info["accelerator"], log_info["origin"], log_info["user"],
                                log_info["facility"], log_info["severity"], log_info["text"])
-            self.log_received.emit(log_data)
+            self.log_entry_received.emit(log_data)
 
-    def append_new_log_message(self, log_data):
+    def append_new_log_message(self, log_data: LogData) -> None:
+        """ Appends a new log message to the table for display """
         self.tableModel.append(log_data)
 
-    def clear_table(self):
+    def clear_table(self) -> None:
+        """ Clears all entries from the table """
         self.tableModel.beginResetModel()
         self.tableModel.log_lines.clear()
         self.tableModel.endResetModel()
 
-    def populate_table(self, data):
+    def populate_table(self, data: Dict[str, Any]) -> None:
+        """
+        Adds historical log data as retrieved from Loki to the table
+
+        Parameters
+        ----------
+        data : Dict
+            A dictionary containing historical log data retrieved from Loki. Expected to have the following structure:
+            {
+                "data": {
+                    "result": [
+                        {
+                            "values": [
+                                [<timestamp>, <log_entry_json_string>],
+                                ...
+                            ]
+                        },
+                        ...
+                    ]
+                }
+            }
+
+            - "values" is a list where each element is a list of two items:
+            1. A string representing the log timestamp in epoch nanoseconds.
+            2. A JSON-formatted string containing the log message details.
+        """
         log_entries = []
         streams = data.get("data", {}).get("result", [])
         for stream in streams:
@@ -347,7 +407,15 @@ class LokiLogViewer(QWidget):
 
         self.tableProxyModel.invalidateFilter()
 
-    def apply_preset(self, index):
+    def apply_preset(self, index: int) -> None:
+        """
+        Applies a user-defined preset to the filtering options, auto-selecting them based on the preset chosen
+
+        Parameters
+        ----------
+        index : int
+            The index of the preset chosen by the user in the UI dropdown menu
+        """
         if index <= 0:
             # Handle the default selection or reset
             for line_edit in self.line_edits.values():
@@ -366,22 +434,26 @@ class LokiLogViewer(QWidget):
             for line_edit in self.line_edits.values():
                 line_edit.clear()
 
-    def reset_combo_box(self):
+    def reset_preset_queries_dropdown(self) -> None:
+        """ Reset the preset queries dropdown """
         self.preset_queries_dropdown.currentIndexChanged.disconnect()
         self.preset_queries_dropdown.setCurrentIndex(0)  # Reset to default item
         self.preset_queries_dropdown.currentIndexChanged.connect(self.apply_preset)
 
-    def closeEvent(self, event: QEvent):
+    def closeEvent(self, event: QEvent) -> None:
+        """ Ensure any remaining connection to Loki is gracefully terminated when the application is closed """
         if self.connected:
             self.toggle_connection()
         event.accept()
 
-    def on_error(self, error):
+    def on_error(self, error) -> None:
+        """ Method called when the QWebsocket encounters an error """
         error_message = self.websocket.errorString()
         self.logger.error(f"WebSocket Error: {error_message}")
         QMessageBox.critical(self, "WebSocket Error", error_message)
 
-    def build_query(self):
+    def build_query(self) -> None:
+        """ Based on the filters the user has selected in the GUI, create a url-encoded query that can be sent to Loki """
         # Start with the base query
         query = '{job="accelerator_logs"}'
 
@@ -412,7 +484,11 @@ class LokiLogViewer(QWidget):
         encoded_query = quote(query, safe='')
         return encoded_query
 
-    def search_messages(self):
+    def search_messages(self) -> None:
+        """
+        Query historical data from Loki based on the user selected query parameters. The request is handled in a
+        separate QThread to keep the application responsive while the data is being fetched
+        """
         query = self.build_query()
         start_date = self.start_date.dateTime()
         end_date = self.end_date.dateTime()
@@ -430,10 +506,14 @@ class LokiLogViewer(QWidget):
         self.thread.finished.connect(self.thread.deleteLater)
         self.thread.start()
 
-    def tail_logs(self):
+    def tail_logs(self) -> None:
+        """
+        Connect to Loki to start receiving a live stream of logging data. Will be displayed in the table as new results
+        are received.
+        """
         query = self.build_query()
         curr_time = int(time.time())
-        self.logger.info(
+        self.logger.debug(
             f"Attempting conneciton to: {self.loki_api_url.replace('http', 'ws')}/loki/api/v1/tail?query={query}&start={curr_time}")
         url = QUrl(f"{self.loki_api_url.replace('http', 'ws')}/loki/api/v1/tail?query={query}&start={curr_time}")
         self.websocket.open(url)

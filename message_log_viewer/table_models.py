@@ -5,8 +5,18 @@ from qtpy.QtCore import QAbstractTableModel, QDateTime, QModelIndex, QObject, QR
 from qtpy.QtGui import QBrush
 
 
-class LokiTableModel(QAbstractTableModel):
-    def __init__(self, max_entries: int = 10000, parent: Optional[QObject] = None):
+class MessageLogTableModel(QAbstractTableModel):
+    """
+    The table model for holding and displaying the log entries received from Loki.
+
+    Parameters
+    ----------
+    max_entries : int, optional
+        The maximum number of rows to display in the table
+    parent : QObject, optional
+        The parent of this widget
+    """
+    def __init__(self, max_entries: Optional[int] = 10000, parent: Optional[QObject] = None):
         super().__init__(parent=parent)
         self.log_lines = deque()
         self.max_entries = max_entries
@@ -21,7 +31,7 @@ class LokiTableModel(QAbstractTableModel):
         )
 
     def rowCount(self, parent) -> int:
-        """Return the row count of the table"""
+        """ Return the row count of the table """
         if parent is not None and parent.isValid():
             return 0
         return len(self.log_lines)
@@ -33,6 +43,7 @@ class LokiTableModel(QAbstractTableModel):
         return len(self.column_names)
 
     def data(self, index: QModelIndex, role: int):
+        """ Return the data for the given role """
         if not index.isValid():
             return None
 
@@ -52,6 +63,7 @@ class LokiTableModel(QAbstractTableModel):
                     return QBrush(Qt.darkYellow)
 
     def getData(self, column_name: str, log_data: LogData):
+        """ Retrieve the data for the given column name from the LogData object """
         if column_name == "Time":
             return str(log_data.time)
         elif column_name == "Accelerator":
@@ -68,12 +80,17 @@ class LokiTableModel(QAbstractTableModel):
             return log_data.text
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
+        """ Retrieve the header data for the given section """
         if role != Qt.DisplayRole:
             return super().headerData(section, orientation, role)
 
         return str(self.column_names[section])
 
     def set_max_entries(self, max_entries: int) -> None:
+        """
+        Set the maximum number of rows to display for the table. Remove excess lines as needed if there are already
+        too many to display
+        """
         self.max_entries = max_entries
         if len(self.log_lines) > self.max_entries:
             excess = len(self.log_lines) - self.max_entries
@@ -83,6 +100,7 @@ class LokiTableModel(QAbstractTableModel):
                 self.endRemoveRows()
 
     def append(self, log_data: LogData) -> None:
+        """ Append a new row of log data to the table """
         self.beginInsertRows(QModelIndex(), 0, 0)
         self.log_lines.appendleft(log_data)
         self.endInsertRows()
@@ -94,10 +112,17 @@ class LokiTableModel(QAbstractTableModel):
 
 
 class LogViewerProxyModel(QSortFilterProxyModel):
-    """ Customize behavior to allow filtering on all columns at the same time """
+    """
+    An implementation of a QSortFilterProxyModel to allow for filtering on all table columns at the same time
 
-    def __init__(self):
-        super().__init__()
+    Parameters
+    ----------
+    parent : QObject
+        The parent of this widget
+    """
+
+    def __init__(self, parent: Optional[QObject] = None):
+        super().__init__(parent)
         self.accelerator_regex = QRegExp("", Qt.CaseInsensitive, QRegExp.RegExp)
         self.origin_regex = QRegExp("", Qt.CaseInsensitive, QRegExp.RegExp)
         self.user_regex = QRegExp("", Qt.CaseInsensitive, QRegExp.RegExp)
@@ -116,7 +141,8 @@ class LogViewerProxyModel(QSortFilterProxyModel):
         self.match_severity = True
         self.match_text = True
 
-    def filterAcceptsRow(self, source_row, source_parent):
+    def filterAcceptsRow(self, source_row, source_parent) -> bool:
+        """ Based on the filters set by the user, determine whether each row in the table should be displayed or not """
         date_index = self.sourceModel().index(source_row, 0, source_parent)
         date_match = True
         if self.use_date:

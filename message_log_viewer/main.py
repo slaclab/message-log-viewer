@@ -1,12 +1,21 @@
+import argparse
+import logging
 import sys
 
 from qtpy.QtWidgets import QApplication
-from .message_log_viewer import LokiLogViewer
+from .message_log_viewer import MessageLogViewer
 
 def main():
+    """ Entry point for the application. """
+    parser = argparse.ArgumentParser(description="Message Log Viewer")
+    parser.add_argument("-l", "--log", default="warning", help="Logging level. debug, info, warning, error, critical")
+    app_args = parser.parse_args()
+
+    logging.basicConfig(level=app_args.log.upper())
+
     app = QApplication(sys.argv)
 
-    message_viewer = LokiLogViewer()
+    message_viewer = MessageLogViewer()
     message_viewer.setWindowTitle('Message Log Viewer')
     message_viewer.resize(1800, 800)
     message_viewer.show()
