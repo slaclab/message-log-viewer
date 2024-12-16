@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools_scm[toml]"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "message-log-viewer"
+description = "Python interface for viewing the message logs"
+readme = "README.md"
+authors = [ {name = "SLAC National Accelerator Laboratory"} ]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3"
+]
+requires-python = ">=3.9"
+dependencies = [
+    "requests",
+    "qtpy"
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/slaclab/message-log-viewer"
+
+[project.license]
+file = "LICENSE.md"
+
+[tool.setuptools_scm]
+version_file = "message_log_viewer/_version.py"
+
+[tool.setuptools.packages.find]
+include = ["message_log_viewer"]
+namespaces = false
