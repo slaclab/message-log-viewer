@@ -3,7 +3,7 @@ import sys
 from qtpy.QtWidgets import QApplication
 from .message_log_viewer import LokiLogViewer
 
-if __name__ == '__main__':
+def main():
     app = QApplication(sys.argv)
 
     message_viewer = LokiLogViewer()
@@ -13,3 +13,6 @@ if __name__ == '__main__':
 
     exit_code = app.exec()
     sys.exit(exit_code)
+
+if __name__ == '__main__':
+    main()

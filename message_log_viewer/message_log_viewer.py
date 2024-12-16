@@ -139,7 +139,7 @@ class LokiLogViewer(QWidget):
         self.end_date = QDateTimeEdit(end_date, calendarPopup=True)
 
         self.presets = None
-        with open("presets.json", "r") as f:
+        with open("message_log_viewer/presets.json", "r") as f:
             self.presets = json.load(f)
 
         self.preset_queries_dropdown = QComboBox()

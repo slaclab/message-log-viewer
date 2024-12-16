@@ -19,6 +19,9 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.scripts]
+message-log-viewer = "message_log_viewer.main:main"
+
 [project.urls]
 Homepage = "https://github.com/slaclab/message-log-viewer"
 
