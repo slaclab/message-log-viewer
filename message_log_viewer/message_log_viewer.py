@@ -287,10 +287,8 @@ class MessageLogViewer(QWidget):
         # print(f'Received: {values}')
         for stream in values["streams"]:
             # print(f'Sub stream: Time: {datetime.fromtimestamp(int(stream["values"][0][0])/1e9)} Values: {json.loads(stream["values"][0][1])}')
-            # data = json.loads(json.loads(stream["values"][0][1])["log"])
             log_time = datetime.fromtimestamp(int(stream["values"][0][0]) / 1e9)
             log_info = json.loads(stream["values"][0][1])
-            # print(f'log time was: {log_time}')
             log_data = LogData(log_time, log_info["accelerator"], log_info["origin"], log_info["user"],
                                log_info["facility"], log_info["severity"], log_info["text"])
             self.log_entry_received.emit(log_data)
@@ -449,7 +447,7 @@ class MessageLogViewer(QWidget):
     def on_error(self, error) -> None:
         """ Method called when the QWebsocket encounters an error """
         error_message = self.websocket.errorString()
-        self.logger.error(f"WebSocket Error: {error_message}")
+        logger.error(f"WebSocket Error: {error_message}")
         QMessageBox.critical(self, "WebSocket Error", error_message)
 
     def build_query(self) -> None:
@@ -495,7 +493,7 @@ class MessageLogViewer(QWidget):
         start_ns = start_date.toMSecsSinceEpoch() * 1000000
         end_ns = end_date.toMSecsSinceEpoch() * 1000000
         url = f"{self.loki_api_url}/loki/api/v1/query_range?query={query}&start={start_ns}&end={end_ns}&limit=1000&direction=backward"
-        print(f'fetching data from: {url}')
+        logger.debug(f'fetching data from: {url}')
         self.thread = QThread()
         self.worker = LogFetcher(url)
         self.worker.moveToThread(self.thread)
@@ -513,7 +511,6 @@ class MessageLogViewer(QWidget):
         """
         query = self.build_query()
         curr_time = int(time.time())
-        self.logger.debug(
-            f"Attempting conneciton to: {self.loki_api_url.replace('http', 'ws')}/loki/api/v1/tail?query={query}&start={curr_time}")
+        logger.debug(f"Attempting conneciton to: {self.loki_api_url.replace('http', 'ws')}/loki/api/v1/tail?query={query}&start={curr_time}")
         url = QUrl(f"{self.loki_api_url.replace('http', 'ws')}/loki/api/v1/tail?query={query}&start={curr_time}")
         self.websocket.open(url)

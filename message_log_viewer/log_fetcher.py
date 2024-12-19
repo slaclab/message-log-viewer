@@ -1,6 +1,9 @@
+import logging
 import requests
 from qtpy.QtCore import QObject, Signal
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 class LogFetcher(QObject):
     """
@@ -30,6 +33,6 @@ class LogFetcher(QObject):
             data = response.json()
             self.data_fetched.emit(data)
         except requests.RequestException as e:
-            print(f"Request for log data failed! Request url: {self.url} Error: {e}")
+            logger.error(f"Request for log data failed! Request url: {self.url} Error: {e}")
         finally:
             self.finished.emit()
