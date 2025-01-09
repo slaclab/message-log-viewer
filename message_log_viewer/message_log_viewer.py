@@ -26,6 +26,8 @@ class MessageLogViewer(QWidget):
 
     Parameters
     ----------
+    default_accelerator: str
+        Which accelerator to monitor logs from (can be changed in the UI at runtime)
     parent : QObject
         The parent of this widget
     """
@@ -34,7 +36,7 @@ class MessageLogViewer(QWidget):
 
     log_entry_received = Signal(LogData)  # Signal emitted when a new log entry is received from the QWebSocket
 
-    def __init__(self, parent: Optional[QObject] = None):
+    def __init__(self, default_accelerator: Optional[str] = "ALL", parent: Optional[QObject] = None):
         super().__init__(parent)
         self.connected = False
         self.websocket = QWebSocket()
@@ -43,6 +45,7 @@ class MessageLogViewer(QWidget):
         if "LOKI_ADDR" not in os.environ:
             logger.warning("Environment variable LOKI_ADDR not set. Application will use http://localhost:8080")
         self.loki_api_url = os.environ.get("LOKI_ADDR", "http://localhost:8080")
+        self.default_accelerator = default_accelerator
         self.init_ui()
         self.log_entry_received.connect(self.append_new_log_message)
 
@@ -80,6 +83,7 @@ class MessageLogViewer(QWidget):
         self.accelerator_dropdown.addItem("FACET")
         self.accelerator_dropdown.addItem("TESTFAC")
         self.accelerator_dropdown.addItem("ALL")
+        self.accelerator_dropdown.setCurrentText(self.default_accelerator)
 
         self.origin_label = QLabel("Origin:")
         self.origin_dropdown = QComboBox()
