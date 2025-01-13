@@ -31,6 +31,9 @@ file = "LICENSE.md"
 [tool.setuptools_scm]
 version_file = "message_log_viewer/_version.py"
 
+[tool.setuptools.package-data]
+message_log_viewer = ["presets.json"]
+
 [tool.setuptools.packages.find]
 include = ["message_log_viewer"]
 namespaces = false

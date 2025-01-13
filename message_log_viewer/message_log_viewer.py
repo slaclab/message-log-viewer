@@ -1,3 +1,4 @@
+import importlib
 import json
 import logging
 import os
@@ -12,6 +13,7 @@ from qtpy.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDateTimeEd
                             QSizePolicy, QMessageBox)
 from typing import Any, Dict, Optional
 from urllib.parse import quote
+import message_log_viewer
 from .log_data import LogData
 from .log_fetcher import LogFetcher
 from .table_models import MessageLogTableModel, LogViewerProxyModel
@@ -153,7 +155,7 @@ class MessageLogViewer(QWidget):
         self.end_date = QDateTimeEdit(end_date, calendarPopup=True)
 
         self.presets = None
-        with open("message_log_viewer/presets.json", "r") as f:
+        with importlib.resources.open_text(message_log_viewer, "presets.json") as f:
             self.presets = json.load(f)
 
         self.preset_queries_dropdown = QComboBox()
