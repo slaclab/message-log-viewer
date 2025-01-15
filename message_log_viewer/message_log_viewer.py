@@ -2,7 +2,6 @@ import importlib
 import json
 import logging
 import os
-import re
 import time
 from datetime import datetime
 from qtpy.QtCore import QDateTime, QEvent, QObject, QRegExp, Qt, Signal, QThread, QUrl
@@ -479,7 +478,7 @@ class MessageLogViewer(QWidget):
         for key, value, should_match in filters:
             if value:
                 operator = "=~" if should_match else "!~"
-                escaped_value = re.escape(value)
+                escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')
                 # Build the regex pattern
                 pattern = f'.*{escaped_value}.*'
                 query += f' | json | {key} {operator} "{pattern}"'
