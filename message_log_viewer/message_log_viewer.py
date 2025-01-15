@@ -70,6 +70,9 @@ class MessageLogViewer(QWidget):
         self.filter_button = QPushButton("Filter")
         self.filter_button.setMaximumSize(120, 30)
         self.filter_button.pressed.connect(self.filter_table)
+        self.clear_filter_button = QPushButton("Clear Filters")
+        self.clear_filter_button.setMaximumSize(120, 30)
+        self.clear_filter_button.pressed.connect(self.clear_filters)
         self.filter_active_label = QLabel("Filter Active: ")
         self.filter_active_label.setStyleSheet("background-color: orange")
         self.filter_active_label.hide()
@@ -182,6 +185,7 @@ class MessageLogViewer(QWidget):
         self.calendar_layout.addWidget(self.end_date)
         self.calendar_layout.addWidget(self.preset_queries_dropdown)
         self.calendar_layout.addWidget(self.filter_button)
+        self.calendar_layout.addWidget(self.clear_filter_button)
 
         self.layout.addLayout(self.calendar_layout)
         self.layout.addWidget(self.filter_active_label)
@@ -410,6 +414,11 @@ class MessageLogViewer(QWidget):
 
         self.tableProxyModel.invalidateFilter()
 
+    def clear_filters(self) -> None:
+        """ Clear all line edits of text so that the user can start fresh """
+        for line_edit in self.line_edits.values():
+            line_edit.clear()
+
     def apply_preset(self, index: int) -> None:
         """
         Applies a user-defined preset to the filtering options, auto-selecting them based on the preset chosen
@@ -434,8 +443,7 @@ class MessageLogViewer(QWidget):
                     self.line_edits[column_name].setText(value)
         else:
             # Clear all line edits if no filters are present
-            for line_edit in self.line_edits.values():
-                line_edit.clear()
+            self.clear_filters()
 
     def reset_preset_queries_dropdown(self) -> None:
         """ Reset the preset queries dropdown """
