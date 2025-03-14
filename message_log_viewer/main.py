@@ -20,6 +20,7 @@ def main():
     message_viewer.setWindowTitle('Message Log Viewer')
     message_viewer.resize(1800, 800)
     message_viewer.show()
+    message_viewer.tail_logs()
 
     exit_code = app.exec()
     sys.exit(exit_code)

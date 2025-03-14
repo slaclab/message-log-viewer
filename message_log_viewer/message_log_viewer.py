@@ -39,7 +39,7 @@ class MessageLogViewer(QWidget):
 
     def __init__(self, default_accelerator: Optional[str] = "ALL", parent: Optional[QObject] = None):
         super().__init__(parent)
-        self.connected = False
+        self.connected = True
         self.websocket = QWebSocket()
         self.websocket.textMessageReceived.connect(self.on_message)
         self.websocket.error.connect(self.on_error)
@@ -235,7 +235,7 @@ class MessageLogViewer(QWidget):
         self.clear_button = QPushButton("Clear table", self)
         self.clear_button.setMinimumWidth(250)
         self.clear_button.clicked.connect(self.clear_table)
-        self.connect_button = QPushButton("Connect to live data", self)
+        self.connect_button = QPushButton("Pause live data", self)
         self.connect_button.setMinimumWidth(250)
         self.connect_button.clicked.connect(self.toggle_connection)
         self.search_button = QPushButton("Retrieve old messages", self)
