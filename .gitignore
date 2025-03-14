@@ -6,7 +6,7 @@ eggs/
 .eggs/
 lib/
 lib64/
-message_log_viewer_version.py
+message_log_viewer/_version.py
 parts/
 sdist/
 var/
