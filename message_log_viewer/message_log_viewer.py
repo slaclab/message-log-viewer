@@ -67,9 +67,6 @@ class MessageLogViewer(QWidget):
         self.filter_text = QLineEdit()
         self.filter_text.setPlaceholderText("Enter a keyword to filter results")
         self.filter_text.setMaximumSize(415, 30)
-        self.filter_button = QPushButton("Filter")
-        self.filter_button.setMaximumSize(120, 30)
-        self.filter_button.pressed.connect(self.filter_table)
         self.clear_filter_button = QPushButton("Clear Filters")
         self.clear_filter_button.setMaximumSize(120, 30)
         self.clear_filter_button.pressed.connect(self.clear_filters)
@@ -82,42 +79,61 @@ class MessageLogViewer(QWidget):
         self.accelerator_match_dropdown = QComboBox()
         self.accelerator_match_dropdown.addItem("==")
         self.accelerator_match_dropdown.addItem("!=")
+        self.accelerator_match_dropdown.currentIndexChanged.connect(self.filter_table)
         self.accelerator_dropdown = QComboBox()
         self.accelerator_dropdown.addItem("LCLS")
         self.accelerator_dropdown.addItem("FACET")
         self.accelerator_dropdown.addItem("TESTFAC")
         self.accelerator_dropdown.addItem("ALL")
         self.accelerator_dropdown.setCurrentText(self.default_accelerator)
+        self.accelerator_dropdown.currentIndexChanged.connect(self.filter_table)
 
         self.origin_label = QLabel("Origin:")
         self.origin_dropdown = QComboBox()
         self.origin_dropdown.addItem(self.MATCH_TEXT)
         self.origin_dropdown.addItem(self.NOT_MATCH_TEXT)
+        self.origin_dropdown.currentIndexChanged.connect(self.filter_table)
         self.origin_field = QLineEdit()
 
         self.user_label = QLabel("User:")
         self.user_dropdown = QComboBox()
         self.user_dropdown.addItem(self.MATCH_TEXT)
         self.user_dropdown.addItem(self.NOT_MATCH_TEXT)
+        self.user_dropdown.currentIndexChanged.connect(self.filter_table)
         self.user_field = QLineEdit()
 
         self.facility_label = QLabel("Facility:")
         self.facility_dropdown = QComboBox()
         self.facility_dropdown.addItem(self.MATCH_TEXT)
         self.facility_dropdown.addItem(self.NOT_MATCH_TEXT)
+        self.facility_dropdown.currentIndexChanged.connect(self.filter_table)
         self.facility_field = QLineEdit()
 
         self.severity_label = QLabel("Severity:")
         self.severity_dropdown = QComboBox()
         self.severity_dropdown.addItem(self.MATCH_TEXT)
         self.severity_dropdown.addItem(self.NOT_MATCH_TEXT)
+        self.severity_dropdown.currentIndexChanged.connect(self.filter_table)
         self.severity_field = QLineEdit()
 
         self.text_label = QLabel("Text:")
         self.text_dropdown = QComboBox()
         self.text_dropdown.addItem(self.MATCH_TEXT)
         self.text_dropdown.addItem(self.NOT_MATCH_TEXT)
+        self.text_dropdown.currentIndexChanged.connect(self.filter_table)
         self.text_field = QLineEdit()
+
+        # Collect all line edits here so that any operation they share can be easily applied to all
+        self.line_edits = {
+            "Origin": self.origin_field,
+            "User": self.user_field,
+            "Facility": self.facility_field,
+            "Severity": self.severity_field,
+            "Text": self.text_field,
+        }
+        for line_edit in self.line_edits.values():
+            line_edit.editingFinished.connect(self.reset_preset_queries_dropdown)
+            line_edit.editingFinished.connect(self.filter_table)
 
         self.dropdown_layout = QHBoxLayout()
         self.dropdown_layout.addWidget(self.accelerator_dropdown_label)
@@ -145,6 +161,7 @@ class MessageLogViewer(QWidget):
     def setup_date_controls(self) -> None:
         """ Set up controls related to the calendar dates of log info to retrieve """
         self.date_checkbox = QCheckBox("Use Date Range")
+        self.date_checkbox.toggled.connect(self.filter_table)
         self.start_date_label = QLabel("Start Date:")
         start_date = QDateTime.currentDateTime().addSecs(-600)
         start_date = start_date.addSecs(-start_date.time().second())
@@ -166,16 +183,6 @@ class MessageLogViewer(QWidget):
             self.preset_queries_dropdown.addItem(preset_name, userData=filters)
         self.preset_queries_dropdown.currentIndexChanged.connect(self.apply_preset)
 
-        self.line_edits = {
-            "Origin": self.origin_field,
-            "User": self.user_field,
-            "Facility": self.facility_field,
-            "Severity": self.severity_field,
-            "Text": self.text_field,
-        }
-        for line_edit in self.line_edits.values():
-            line_edit.textChanged.connect(self.reset_preset_queries_dropdown)
-
         self.calendar_layout = QHBoxLayout()
         self.calendar_layout.setAlignment(Qt.AlignLeft)
         self.calendar_layout.addWidget(self.date_checkbox)
@@ -184,7 +191,6 @@ class MessageLogViewer(QWidget):
         self.calendar_layout.addWidget(self.end_date_label)
         self.calendar_layout.addWidget(self.end_date)
         self.calendar_layout.addWidget(self.preset_queries_dropdown)
-        self.calendar_layout.addWidget(self.filter_button)
         self.calendar_layout.addWidget(self.clear_filter_button)
 
         self.layout.addLayout(self.calendar_layout)
@@ -418,6 +424,7 @@ class MessageLogViewer(QWidget):
         """ Clear all line edits of text so that the user can start fresh """
         for line_edit in self.line_edits.values():
             line_edit.clear()
+        self.reset_preset_queries_dropdown()
         self.filter_table()
 
     def apply_preset(self, index: int) -> None:
@@ -433,6 +440,7 @@ class MessageLogViewer(QWidget):
             # Handle the default selection or reset
             for line_edit in self.line_edits.values():
                 line_edit.clear()
+            self.filter_table()
             return
 
         # Get the filter values associated with the selected preset
@@ -445,6 +453,7 @@ class MessageLogViewer(QWidget):
         else:
             # Clear all line edits if no filters are present
             self.clear_filters()
+        self.filter_table()
 
     def reset_preset_queries_dropdown(self) -> None:
         """ Reset the preset queries dropdown """
