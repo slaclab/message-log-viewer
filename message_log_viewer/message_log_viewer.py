@@ -418,6 +418,7 @@ class MessageLogViewer(QWidget):
         """ Clear all line edits of text so that the user can start fresh """
         for line_edit in self.line_edits.values():
             line_edit.clear()
+        self.filter_table()
 
     def apply_preset(self, index: int) -> None:
         """
