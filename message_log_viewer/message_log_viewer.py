@@ -510,6 +510,10 @@ class MessageLogViewer(QWidget):
         Query historical data from Loki based on the user selected query parameters. The request is handled in a
         separate QThread to keep the application responsive while the data is being fetched
         """
+        if hasattr(self, 'fetch_thread') and self.fetch_thread is not None and self.fetch_thread.isRunning():
+            logger.warning("Fetch already in progress — ignoring new request.")
+            return
+
         query = self.build_query()
         start_date = self.start_date.dateTime()
         end_date = self.end_date.dateTime()
@@ -517,15 +521,19 @@ class MessageLogViewer(QWidget):
         end_ns = end_date.toMSecsSinceEpoch() * 1000000
         url = f"{self.loki_api_url}/loki/api/v1/query_range?query={query}&start={start_ns}&end={end_ns}&limit=1000&direction=backward"
         logger.debug(f'fetching data from: {url}')
-        self.thread = QThread()
+        self.fetch_thread = QThread()
         self.worker = LogFetcher(url)
-        self.worker.moveToThread(self.thread)
-        self.thread.started.connect(self.worker.fetch_logs)
+        self.worker.moveToThread(self.fetch_thread)
+        self.fetch_thread.started.connect(self.worker.fetch_logs)
         self.worker.data_fetched.connect(self.populate_table)
-        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.fetch_thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.start()
+        self.fetch_thread.finished.connect(self.fetch_thread.deleteLater)
+        self.fetch_thread.finished.connect(self.on_fetch_complete)
+        self.fetch_thread.start()
+
+    def on_fetch_complete(self):
+        self.fetch_thread = None  # Reset so the next call can create a new thread
 
     def tail_logs(self) -> None:
         """
