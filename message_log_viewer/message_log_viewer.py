@@ -167,11 +167,13 @@ class MessageLogViewer(QWidget):
         start_date = start_date.addSecs(-start_date.time().second())
         start_date = start_date.addMSecs(-start_date.time().msec())
         self.start_date = QDateTimeEdit(start_date, calendarPopup=True)
+        self.start_date.dateTimeChanged.connect(self.filter_table)
         self.end_date_label = QLabel("End Date:")
         end_date = QDateTime.currentDateTime()
         end_date = end_date.addSecs(-end_date.time().second())
         end_date = end_date.addMSecs(-end_date.time().msec())
         self.end_date = QDateTimeEdit(end_date, calendarPopup=True)
+        self.end_date.dateTimeChanged.connect(self.filter_table)
 
         self.presets = None
         with importlib.resources.open_text(message_log_viewer, "presets.json") as f:
