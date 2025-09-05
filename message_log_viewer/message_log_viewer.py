@@ -39,7 +39,7 @@ class MessageLogViewer(QWidget):
 
     def __init__(self, default_accelerator: Optional[str] = "ALL", parent: Optional[QObject] = None):
         super().__init__(parent)
-        self.connected = True
+        self.connected_to_live_data = False
         self.websocket = QWebSocket()
         self.websocket.textMessageReceived.connect(self.on_message)
         self.websocket.error.connect(self.on_error)
@@ -266,13 +266,13 @@ class MessageLogViewer(QWidget):
 
     def toggle_connection(self) -> None:
         """ Connect to live data if not yet connected, otherwise closeout the websocket if we are connected """
-        if not self.connected:
+        if not self.connected_to_live_data:
             self.connect_button.setText("Pause live data")
             self.tail_logs()
         else:
             self.connect_button.setText("Connect to live data")
             self.websocket.close()
-        self.connected = not self.connected
+        self.connected_to_live_data = not self.connected_to_live_data
 
     def update_max_rows(self) -> None:
         """ Updates the maximum amount of rows of data that will be stored in for display in the table """
@@ -422,6 +422,10 @@ class MessageLogViewer(QWidget):
 
         self.tableProxyModel.invalidateFilter()
 
+        # If we're reading live data while the user adjusts a filter, re-open the websocket with the new filter applied
+        if self.connected_to_live_data:
+            self.tail_logs()
+
     def clear_filters(self) -> None:
         """ Clear all line edits of text so that the user can start fresh """
         for line_edit in self.line_edits.values():
@@ -465,7 +469,7 @@ class MessageLogViewer(QWidget):
 
     def closeEvent(self, event: QEvent) -> None:
         """ Ensure any remaining connection to Loki is gracefully terminated when the application is closed """
-        if self.connected:
+        if self.connected_to_live_data:
             self.toggle_connection()
         event.accept()
 
@@ -542,8 +546,11 @@ class MessageLogViewer(QWidget):
         Connect to Loki to start receiving a live stream of logging data. Will be displayed in the table as new results
         are received.
         """
+        if self.connected_to_live_data:
+            self.websocket.close()
         query = self.build_query()
         curr_time = int(time.time())
         logger.debug(f"Attempting conneciton to: {self.loki_api_url.replace('http', 'ws')}/loki/api/v1/tail?query={query}&start={curr_time}")
         url = QUrl(f"{self.loki_api_url.replace('http', 'ws')}/loki/api/v1/tail?query={query}&start={curr_time}")
         self.websocket.open(url)
+        self.connected_to_live_data = True
