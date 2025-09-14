@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from qtpy.QtCore import QDateTime, QEvent, QObject, QRegExp, Qt, Signal, QThread, QUrl
 from qtpy.QtGui import QIntValidator
+from qtpy.QtNetwork import QAbstractSocket
 from qtpy.QtWebSockets import QWebSocket
 from qtpy.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDateTimeEdit, QLabel, QTableView, QFormLayout,
                             QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QHeaderView, QLineEdit, QSpacerItem,
@@ -39,8 +40,9 @@ class MessageLogViewer(QWidget):
 
     def __init__(self, default_accelerator: Optional[str] = "ALL", parent: Optional[QObject] = None):
         super().__init__(parent)
-        self.connected_to_live_data = False
         self.websocket = QWebSocket()
+        self.websocket.connected.connect(self._on_connected)
+        self.websocket.disconnected.connect(self._on_disconnected)
         self.websocket.textMessageReceived.connect(self.on_message)
         self.websocket.error.connect(self.on_error)
         if "LOKI_ADDR" not in os.environ:
@@ -264,15 +266,19 @@ class MessageLogViewer(QWidget):
         self.bottom_layout.addLayout(self.action_layout)
         self.layout.addLayout(self.bottom_layout)
 
+    def _on_connected(self):
+        self.connect_button.setText("Pause live data")
+
+    def _on_disconnected(self):
+        self.connect_button.setText("Connect to live data")
+
+
     def toggle_connection(self) -> None:
         """ Connect to live data if not yet connected, otherwise closeout the websocket if we are connected """
-        if not self.connected_to_live_data:
-            self.connect_button.setText("Pause live data")
+        if not self.connected_to_live_data():
             self.tail_logs()
         else:
-            self.connect_button.setText("Connect to live data")
             self.websocket.close()
-        self.connected_to_live_data = not self.connected_to_live_data
 
     def update_max_rows(self) -> None:
         """ Updates the maximum amount of rows of data that will be stored in for display in the table """
@@ -423,7 +429,7 @@ class MessageLogViewer(QWidget):
         self.tableProxyModel.invalidateFilter()
 
         # If we're reading live data while the user adjusts a filter, re-open the websocket with the new filter applied
-        if self.connected_to_live_data:
+        if self.connected_to_live_data():
             self.tail_logs()
 
     def clear_filters(self) -> None:
@@ -479,7 +485,7 @@ class MessageLogViewer(QWidget):
         logger.error(f"WebSocket Error: {error_message}")
         QMessageBox.critical(self, "WebSocket Error", error_message)
 
-    def build_query(self) -> None:
+    def build_query(self) -> str:
         """ Based on the filters the user has selected in the GUI, create a url-encoded query that can be sent to Loki """
         # Start with the base query
         query = '{job="accelerator_logs"}'
@@ -541,16 +547,21 @@ class MessageLogViewer(QWidget):
     def on_fetch_complete(self):
         self.fetch_thread = None  # Reset so the next call can create a new thread
 
+    def connected_to_live_data(self):
+        return self.websocket.state() in (QAbstractSocket.SocketState.ConnectedState,
+                                          QAbstractSocket.SocketState.ConnectingState)
+
     def tail_logs(self) -> None:
         """
         Connect to Loki to start receiving a live stream of logging data. Will be displayed in the table as new results
         are received.
         """
-        if self.connected_to_live_data:
+        # Close current connection if it exists, so we can rebuild the query and re-open the connection
+        if self.connected_to_live_data():
             self.websocket.close()
+
         query = self.build_query()
         curr_time = int(time.time())
         logger.debug(f"Attempting conneciton to: {self.loki_api_url.replace('http', 'ws')}/loki/api/v1/tail?query={query}&start={curr_time}")
         url = QUrl(f"{self.loki_api_url.replace('http', 'ws')}/loki/api/v1/tail?query={query}&start={curr_time}")
         self.websocket.open(url)
-        self.connected_to_live_data = True
