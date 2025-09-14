@@ -475,7 +475,7 @@ class MessageLogViewer(QWidget):
 
     def closeEvent(self, event: QEvent) -> None:
         """ Ensure any remaining connection to Loki is gracefully terminated when the application is closed """
-        if self.connected_to_live_data:
+        if self.connected_to_live_data():
             self.toggle_connection()
         event.accept()
 
