@@ -65,7 +65,7 @@ class MessageLogTableModel(QAbstractTableModel):
     def getData(self, column_name: str, log_data: LogData):
         """ Retrieve the data for the given column name from the LogData object """
         if column_name == "Time":
-            return str(log_data.time)
+            return log_data.time.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         elif column_name == "Accelerator":
             return log_data.accelerator
         elif column_name == "Origin":
@@ -148,7 +148,6 @@ class LogViewerProxyModel(QSortFilterProxyModel):
         if self.use_date:
             log_date_str = self.sourceModel().data(date_index, Qt.DisplayRole)
             if log_date_str != None:
-                log_date_str = log_date_str[:23]
                 log_date = QDateTime.fromString(log_date_str, "yyyy-MM-dd HH:mm:ss.zzz")
                 if log_date < self.start_date or log_date > self.end_date:
                     date_match = False
