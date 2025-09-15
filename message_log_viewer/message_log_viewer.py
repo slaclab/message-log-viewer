@@ -226,6 +226,18 @@ class MessageLogViewer(QWidget):
         self.tableView.horizontalHeader().setStretchLastSection(True)
         self.tableView.horizontalHeader().setSectionsMovable(True)
 
+        self.count_label = QLabel("Total rows: 0 (0 hidden)")
+        self.tableModel.rowsInserted.connect(self.update_row_counts)
+        self.tableModel.rowsRemoved.connect(self.update_row_counts)
+        self.tableModel.modelReset.connect(self.update_row_counts)
+
+        self.tableProxyModel.rowsInserted.connect(self.update_row_counts)
+        self.tableProxyModel.rowsRemoved.connect(self.update_row_counts)
+        self.tableProxyModel.modelReset.connect(self.update_row_counts)
+        self.tableProxyModel.layoutChanged.connect(self.update_row_counts)
+
+        self.update_row_counts()
+
         self.layout.addWidget(self.tableView)
 
 
@@ -253,6 +265,10 @@ class MessageLogViewer(QWidget):
         self.search_button.clicked.connect(self.search_messages)
         self.max_rows_layout.addRow(self.max_rows_label, self.max_rows_edit)
 
+        self.count_label.setObjectName("rowCountLabel")
+        self.count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.count_label.setStyleSheet("#rowCountLabel { color: #555; }")
+
         self.max_rows_layout.setSpacing(0)
         self.max_rows_layout.setContentsMargins(0, 0, 0, 0)  # Remove any outer margin
         self.max_rows_layout.setAlignment(Qt.AlignLeft)
@@ -262,7 +278,9 @@ class MessageLogViewer(QWidget):
         self.action_layout.addWidget(self.search_button)
         self.action_layout.setAlignment(Qt.AlignRight)
         self.bottom_layout.addLayout(self.max_rows_layout)
-        self.bottom_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        self.bottom_layout.addStretch(1)
+        self.bottom_layout.addWidget(self.count_label)
+        self.bottom_layout.addStretch(1)
         self.bottom_layout.addLayout(self.action_layout)
         self.layout.addLayout(self.bottom_layout)
 
@@ -272,6 +290,16 @@ class MessageLogViewer(QWidget):
     def _on_disconnected(self):
         self.connect_button.setText("Connect to live data")
 
+    def _compute_row_counts(self) -> tuple[int, int]:
+        """ Return a count of the rows in the table (total, hidden) """
+        total = self.tableModel.rowCount()
+        # If the view is showing the proxy, visible rows are proxy’s rows, otherwise it's total
+        if self.tableView.model() is self.tableProxyModel:
+            visible = self.tableProxyModel.rowCount()
+        else:
+            visible = total
+        hidden = max(total - visible, 0)
+        return total, hidden
 
     def toggle_connection(self) -> None:
         """ Connect to live data if not yet connected, otherwise closeout the websocket if we are connected """
@@ -284,6 +312,11 @@ class MessageLogViewer(QWidget):
         """ Updates the maximum amount of rows of data that will be stored in for display in the table """
         max_rows = int(self.max_rows_edit.text())
         self.tableModel.set_max_entries(max_rows)
+
+    def update_row_counts(self) -> None:
+        """ Refresh the footer label with current counts """
+        total, hidden = self._compute_row_counts()
+        self.count_label.setText(f"Total rows: {total} ({hidden} hidden)")
 
     def on_message(self, message: str) -> None:
         """
@@ -385,6 +418,7 @@ class MessageLogViewer(QWidget):
             # when first loading data into the table
             self.first_filter = False
             self.tableView.setModel(self.tableProxyModel)
+            self.update_row_counts()
 
         accelerator = self.accelerator_dropdown.currentText()
         if accelerator == "ALL":

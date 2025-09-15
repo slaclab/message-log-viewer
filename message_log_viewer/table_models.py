@@ -30,13 +30,13 @@ class MessageLogTableModel(QAbstractTableModel):
             "Text",
         )
 
-    def rowCount(self, parent) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """ Return the row count of the table """
         if parent is not None and parent.isValid():
             return 0
         return len(self.log_lines)
 
-    def columnCount(self, parent) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Return the column count of the table"""
         if parent is not None and parent.isValid():
             return 0
