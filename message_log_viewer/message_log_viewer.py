@@ -586,13 +586,20 @@ class MessageLogViewer(QWidget):
         self.worker.moveToThread(self.fetch_thread)
         self.fetch_thread.started.connect(self.worker.fetch_logs)
         self.worker.data_fetched.connect(self.populate_table)
+        self.worker.started.connect(self.on_fetch_start)
         self.worker.finished.connect(self.fetch_thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.fetch_thread.finished.connect(self.fetch_thread.deleteLater)
         self.fetch_thread.finished.connect(self.on_fetch_complete)
         self.fetch_thread.start()
 
+    def on_fetch_start(self):
+        self.search_button.setText("Retrieving data…")
+        self.search_button.setEnabled(False)
+
     def on_fetch_complete(self):
+        self.search_button.setText("Retrieve old messages")
+        self.search_button.setEnabled(True)
         self.fetch_thread = None  # Reset so the next call can create a new thread
 
     def connected_to_live_data(self):

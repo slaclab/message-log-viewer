@@ -16,6 +16,7 @@ class LogFetcher(QObject):
         e.g. http://localhost:80/loki/api/v1/query_range?query={query}&start={start_ns}&end={end_ns}
     """
     data_fetched = Signal(dict)
+    started = Signal()
     finished = Signal()
 
     def __init__(self, url: str, parent: Optional[QObject] = None):
@@ -28,6 +29,7 @@ class LogFetcher(QObject):
         letting the client know the data is ready.
         """
         try:
+            self.started.emit()
             response = requests.get(self.url)
             response.raise_for_status()
             data = response.json()
