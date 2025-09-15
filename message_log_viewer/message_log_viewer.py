@@ -579,7 +579,8 @@ class MessageLogViewer(QWidget):
         end_date = self.end_date.dateTime()
         start_ns = start_date.toMSecsSinceEpoch() * 1000000
         end_ns = end_date.toMSecsSinceEpoch() * 1000000
-        url = f"{self.loki_api_url}/loki/api/v1/query_range?query={query}&start={start_ns}&end={end_ns}&limit=1000&direction=backward"
+        requested_limit = max(1, min(self.tableModel.max_entries, 50000))  # Cap the limit just in case the user sets it too high
+        url = f"{self.loki_api_url}/loki/api/v1/query_range?query={query}&start={start_ns}&end={end_ns}&limit={requested_limit}&direction=backward"
         logger.debug(f'fetching data from: {url}')
         self.fetch_thread = QThread()
         self.worker = LogFetcher(url)
