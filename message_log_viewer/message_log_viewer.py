@@ -238,6 +238,13 @@ class MessageLogViewer(QWidget):
 
         self.update_row_counts()
 
+        # Banner in case the user makes a query that returns over the maximum amount of rows that can be displayed
+        self.warning_banner = QLabel(f"WARNING: Query returned more than the maximum number of displayable rows")
+        self.warning_banner.setStyleSheet("background-color: orange; color: black; padding: 6px; font-weight: bold;")
+        self.warning_banner.setAlignment(Qt.AlignCenter)
+        self.warning_banner.hide()
+
+        self.layout.addWidget(self.warning_banner)
         self.layout.addWidget(self.tableView)
 
 
@@ -358,6 +365,7 @@ class MessageLogViewer(QWidget):
         self.tableModel.beginResetModel()
         self.tableModel.log_lines.clear()
         self.tableModel.endResetModel()
+        self.warning_banner.hide()
 
     def populate_table(self, data: Dict[str, Any]) -> None:
         """
@@ -410,6 +418,12 @@ class MessageLogViewer(QWidget):
         log_entries.sort(key=lambda x: x.time)
         for log_data in log_entries:
             self.tableModel.append(log_data)
+
+        if len(log_entries) >= self.tableModel.max_entries:
+            self.warning_banner.show()
+        else:
+            self.warning_banner.hide()
+
 
     def filter_table(self) -> None:
         """Filter the table based on the text typed into the filter bar"""
