@@ -49,6 +49,7 @@ class MessageLogViewer(QWidget):
             logger.warning("Environment variable LOKI_ADDR not set. Application will use http://localhost:8080")
         self.loki_api_url = os.environ.get("LOKI_ADDR", "http://localhost:8080")
         self.default_accelerator = default_accelerator
+        self.user_paused = False  # If the user paused live data, or it disconnected some other way
         self.init_ui()
         self.log_entry_received.connect(self.append_new_log_message)
 
@@ -66,9 +67,6 @@ class MessageLogViewer(QWidget):
 
     def setup_fiter_controls(self) -> None:
         """ Set up all controls needed for filtering log information """
-        self.filter_text = QLineEdit()
-        self.filter_text.setPlaceholderText("Enter a keyword to filter results")
-        self.filter_text.setMaximumSize(415, 30)
         self.clear_filter_button = QPushButton("Clear Filters")
         self.clear_filter_button.setMaximumSize(120, 30)
         self.clear_filter_button.pressed.connect(self.clear_filters)
@@ -296,6 +294,8 @@ class MessageLogViewer(QWidget):
 
     def _on_disconnected(self):
         self.connect_button.setText("Connect to live data")
+        if not self.user_paused:  # Auto reconnect when Loki automatically hangs up after 60 minutes
+            self.tail_logs()
 
     def _compute_row_counts(self) -> tuple[int, int]:
         """ Return a count of the rows in the table (total, hidden) """
@@ -311,9 +311,11 @@ class MessageLogViewer(QWidget):
     def toggle_connection(self) -> None:
         """ Connect to live data if not yet connected, otherwise closeout the websocket if we are connected """
         if not self.connected_to_live_data():
+            self.user_paused = False
             self.warning_banner.hide()
             self.tail_logs()
         else:
+            self.user_paused = True
             self.websocket.close()
 
     def update_max_rows(self) -> None:
@@ -349,13 +351,13 @@ class MessageLogViewer(QWidget):
         logger.debug(f'Received log message: {message}')
         values = json.loads(message)
         # print(f'Received: {values}')
-        for stream in values["streams"]:
-            # print(f'Sub stream: Time: {datetime.fromtimestamp(int(stream["values"][0][0])/1e9)} Values: {json.loads(stream["values"][0][1])}')
-            log_time = datetime.fromtimestamp(int(stream["values"][0][0]) / 1e9)
-            log_info = json.loads(stream["values"][0][1])
-            log_data = LogData(log_time, log_info["accelerator"], log_info["origin"], log_info["user"],
-                               log_info["facility"], log_info["severity"], log_info["text"])
-            self.log_entry_received.emit(log_data)
+        for stream in values.get("streams", []):
+            for ts, payload in stream.get("values", []):
+                log_time = datetime.fromtimestamp(int(ts) / 1e9)
+                log_info = json.loads(payload)
+                log_data = LogData(log_time, log_info["accelerator"], log_info["origin"], log_info["user"],
+                                   log_info["facility"], log_info["severity"], log_info["text"])
+                self.log_entry_received.emit(log_data)
 
     def append_new_log_message(self, log_data: LogData) -> None:
         """ Appends a new log message to the table for display """
@@ -536,7 +538,6 @@ class MessageLogViewer(QWidget):
         """ Method called when the QWebsocket encounters an error """
         error_message = self.websocket.errorString()
         logger.error(f"WebSocket Error: {error_message}")
-        QMessageBox.critical(self, "WebSocket Error", error_message)
 
     def build_query(self) -> str:
         """ Based on the filters the user has selected in the GUI, create a url-encoded query that can be sent to Loki """
