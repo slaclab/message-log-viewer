@@ -311,6 +311,7 @@ class MessageLogViewer(QWidget):
     def toggle_connection(self) -> None:
         """ Connect to live data if not yet connected, otherwise closeout the websocket if we are connected """
         if not self.connected_to_live_data():
+            self.warning_banner.hide()
             self.tail_logs()
         else:
             self.websocket.close()
@@ -419,7 +420,11 @@ class MessageLogViewer(QWidget):
         for log_data in log_entries:
             self.tableModel.append(log_data)
 
-        if len(log_entries) >= self.tableModel.max_entries:
+        if len(log_entries) == 0:
+            self.warning_banner.setText("No results match that query in that time frame")
+            self.warning_banner.show()
+        elif len(log_entries) >= self.tableModel.max_entries:
+            self.warning_banner.setText("WARNING: Query returned more than the maximum number of displayable rows")
             self.warning_banner.show()
         else:
             self.warning_banner.hide()
